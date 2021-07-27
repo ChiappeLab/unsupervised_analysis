@@ -18,10 +18,136 @@ import numpy.ma as ma
 import math
 from joblib import Parallel, delayed
 from numba import jit
+from analysis_tools import concaTseries
+
+@jit(nopython=True)
+def get_theta_m(timeseries, y, lag):
+    """Computes the loglikelihood of the parameters theta fitting y
+        THIS FUNCTION IS IMPLEMENTED FOR LAG > 1
+    
+    Parameters
+    ----------      
+    y (array): 
+        Time series to be fitted
+    
+    l1 (int64):
+        Length of y
+        
+
+    Returns
+    -------
+    theta (array): 
+        Estimated parameters by the AR process (p=1)
+        
+    """
+
+    skeleton_p = np.ones(1)
+    skeleton_f = np.ones(1)
+    for x in timeseries:
+        seq = np.concatenate( (np.ones(x.shape[0]-lag),np.zeros(lag) ))
+        skeleton_p = np.concatenate( (skeleton_p,seq) )
+        skeleton_f = np.concatenate( (skeleton_f,seq[::-1]) )
+    skeleton_p = skeleton_p[1:]>0
+    skeleton_f = skeleton_f[1:]>0
+    
+    yp = np.ones( ( y.shape[0]-(len(timeseries)*lag) , y.shape[1]*lag) )
+    pos = np.arange(0,y.shape[1]*lag,1).reshape(lag,y.shape[1])
+    for j, roll_ in enumerate(np.arange(lag,0,-1)):
+        yp[:, pos[j][0]:pos[j][-1]+1] = y[np.roll(skeleton_p,roll_-1),:]     
+    
+    yf = y[skeleton_f, :]
+    
+    x_inter = np.hstack( (np.ones((yp.shape[0],1)) , yp) )
+    pinverse = np.linalg.pinv(x_inter)
+    beta = np.dot(pinverse,yf)
+    pred = np.dot(x_inter,beta)
+    eps = yf - pred
+    cov = np.cov(eps.T)
+    theta = np.vstack((beta, cov))
+    
+    return theta, eps
+
+@jit(nopython=True)
+def loglik_m(theta, timeseries, y, lag):
+    """Computes the loglikelihood of the parameters theta fitting y
+        THIS FUNCTION IS IMPLEMENTED FOR LAG > 1
+    
+    Parameters
+    ----------
+    theta (array): 
+        Estimated parameters by the AR process (p=1)
+        
+    y (array): 
+        Time series to be fitted
+        
+
+    Returns
+    -------
+    results (float64): 
+        Log-likelihood distance
+        
+    """
+    
+    T = y.shape[0]
+    dim = y.shape[1]
+
+    sigma = theta[lag*theta.shape[1]+1:] # covariance matrix    
+    sigmainv=np.linalg.pinv(sigma)
+    abs_log_det_inv_s = np.linalg.slogdet(sigmainv)[1]
+    
+    skeleton_p = np.ones(1)
+    skeleton_f = np.ones(1)
+    for x in timeseries:
+        seq = np.concatenate( (np.ones(x.shape[0]-lag),np.zeros(lag) ))
+        skeleton_p = np.concatenate( (skeleton_p,seq) )
+        skeleton_f = np.concatenate( (skeleton_f,seq[::-1]) )
+    skeleton_p = skeleton_p[1:]>0
+    skeleton_f = skeleton_f[1:]>0
+    
+    yp = np.ones( ( y.shape[0]-(len(timeseries)*lag) , y.shape[1]*lag) )
+    pos = np.arange(0,y.shape[1]*lag,1).reshape(lag,y.shape[1])
+    for j, roll_ in enumerate(np.arange(lag,0,-1)):
+        yp[:, pos[j][0]:pos[j][-1]+1] = y[np.roll(skeleton_p,roll_-1),:]        
+    
+    yf = y[skeleton_f, :]
+    
+    x_inter = np.hstack( (np.ones((yp.shape[0],1)) , yp) )
+    beta = theta[:lag*theta.shape[1]+1]
+    pred = np.dot(x_inter,beta)
+    eps = yf - pred
+    
+    elem_sum = np.ones((1,len(eps)))
+    for i in range(len(eps)):
+        elem_sum[:,i] = np.dot(eps[i].T, np.dot(sigmainv,eps[i]))
+    last_term = np.sum(elem_sum)
+    
+    result = (-0.5*dim*(T-1)*math.log(2*math.pi) + 0.5*(T-1)*abs_log_det_inv_s
+            -0.5*last_term)
+   
+    return result
+
 
 
 @jit
 def myGetTheta_m(y,l1):
+    """Computes the loglikelihood of the parameters theta fitting y
+        THIS FUNCTION IS IMPLEMENTED FOR LAG = 1
+    
+    Parameters
+    ----------      
+    y (array): 
+        Time series to be fitted
+    
+    l1 (int64):
+        Length of y
+        
+
+    Returns
+    -------
+    theta (array): 
+        Estimated parameters by the AR process (p=1)
+        
+    """
     
     yp = np.concatenate((y[:l1-1,:],y[l1:-1,:]))
     yf = np.concatenate((y[1:l1,:],y[l1+1:,:]))
@@ -43,6 +169,25 @@ def myGetTheta_m(y,l1):
 
 @jit
 def myLogLik_m(theta, y):
+    """Computes the loglikelihood of the parameters theta fitting y
+        THIS FUNCTION IS IMPLEMENTED FOR LAG = 1
+    
+    Parameters
+    ----------
+    theta (array): 
+        Estimated parameters by the AR process (p=1)
+        
+    y (array): 
+        Time series to be fitted
+        
+
+    Returns
+    -------
+    results (float64): 
+        Log-likelihood distance
+        
+    """
+    
     T = y.shape[0]
     dim = y.shape[1]
     clag = 1
@@ -76,13 +221,34 @@ def myLogLik_m(theta, y):
     return result
 
 def compute_diss_mat(seg_time, tseries):
+    """Computes the dissimilarity matrix between two segments using 
+        a log-likehood function
+        THIS FUNCTION IS IMPLEMENTED FOR LAG = 1
+    
+    Parameters
+    ----------
+    seg_time (list): 
+        Contains the breakpoints that define each segment [t_initial, t_end]
+        
+    tseries (array): 
+        Time series of the kinematics
+        
+
+    Returns
+    -------
+    dissimilarity_matrix (array, float32): 
+        The matrix that contains the pairwise comparison of the segments in
+        seg_time and the time series tseries
+        
+    """
     
     c = combinations(range(len(seg_time)),2)
     dissimilarity_matrix = np.zeros((len(seg_time),len(seg_time)))
     dissimilarity_matrix = np.float32(dissimilarity_matrix)
     tseries = np.float64(tseries)
     
-    for model in tqdm(list(c)):
+    # for model in tqdm(list(c)):
+    for model in c:
         modelx, modely = model 
         t0_w1, tf_w1 = seg_time[modelx]
         t0_w2, tf_w2 = seg_time[modely]
@@ -104,8 +270,7 @@ def compute_diss_mat(seg_time, tseries):
 
 if __name__ == "__main__":
     
-    from analysis_tools import concaTseries
-    
+       
     flies = list(np.concatenate((np.arange(1641,1645,1),np.arange(1646,1654,1),np.arange(1655,1659,1),[1660,1661])))
     filename = ['Fly_','_dark_hang_975.pickle']
     seg_time_dark, tseries_dark = concaTseries(flies,filename)
