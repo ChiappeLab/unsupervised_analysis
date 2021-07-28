@@ -7,6 +7,7 @@ Created on Thu Jul 15 20:57:42 2021
 
 import numpy as np
 import matplotlib.pyplot as plt
+import os
 from tqdm import tqdm
 import scipy.io
 import itertools
@@ -247,8 +248,9 @@ def compute_diss_mat(seg_time, tseries):
     dissimilarity_matrix = np.float32(dissimilarity_matrix)
     tseries = np.float64(tseries)
     
-    # for model in tqdm(list(c)):
+    # for model in tqdm(list(c)): #enable in case you want to have a progress bar
     for model in c:
+        print('I am here')
         modelx, modely = model 
         t0_w1, tf_w1 = seg_time[modelx]
         t0_w2, tf_w2 = seg_time[modely]
@@ -267,19 +269,44 @@ def compute_diss_mat(seg_time, tseries):
     
     return dissimilarity_matrix
 
+def cleaning_procedure(seg_time, tseries, dissimilarity_matrix, labels_cond):
+    pos = np.where(np.isnan(dissimilarity_matrix))
+    dissimilarity_matrix = np.delete(dissimilarity_matrix,np.unique(pos[0]),axis = 0)
+    dissimilarity_matrix = np.delete(dissimilarity_matrix,np.unique(pos[1]),axis = 1)
+    
+    seg_time = [i for j, i in enumerate(seg_time) if j not in np.unique(pos[0])]
+    labels_cond = [i for j, i in enumerate(labels_cond) if j not in np.unique(pos[0])]
+    
+    pos = np.where(dissimilarity_matrix<0)
+    dissimilarity_matrix = np.delete(dissimilarity_matrix,np.unique(pos[1][:20063]),axis = 0)
+    dissimilarity_matrix = np.delete(dissimilarity_matrix,np.unique(pos[1][:20063]),axis = 1)
+    
+    seg_time = [i for j, i in enumerate(seg_time) if j not in np.unique(pos[1][:20063])]
+    labels_cond = [i for j, i in enumerate(labels_cond) if j not in np.unique(pos[1][:20063])]
+    
+    return seg_time, tseries, dissimilarity_matrix, labels_cond
+
+def generate_labels_per_condition(seg_time):
+    labels = list(chain.from_iterable(repeat(i, K) for i,K in zip([0,1,2],[33*5401*2,33*5401*2,18*5401*4]))) 
+    labels = [labels[x[0]] for x in seg_time]
+    col = ['1d','10d','darkness']
+    labels_cond = [col[i] for i in labels]
+    
+    return labels_cond
+
 
 if __name__ == "__main__":
     
-       
+    path = os.path.dirname(os.getcwd()) + '\\Processed data\\'
     flies = list(np.concatenate((np.arange(1641,1645,1),np.arange(1646,1654,1),np.arange(1655,1659,1),[1660,1661])))
-    filename = ['Fly','_acc_4ss_log21.pickle']
+    filename = [path+'Fly','_acc_4ss_log21.pickle']
     seg_time_dark, tseries_dark = concaTseries(flies,filename)
     
     flies = list(np.concatenate(([1893,1894],np.arange(1896,1912,1),np.arange(2101,2113,1),np.arange(2114,2117,1))))
-    filename = ['Fly','_acc_1d_log21.pickle']
+    filename = [path+'Fly','_acc_1d_log21.pickle']
     seg_time_1d, tseries_1d = concaTseries(flies,filename)
     
-    filename = ['Fly','_acc_10d_log21.pickle']
+    filename = [path+'Fly','_acc_10d_log21.pickle']
     seg_time_10d, tseries_10d = concaTseries(flies,filename)
 
     
@@ -290,6 +317,13 @@ if __name__ == "__main__":
     tseries = np.concatenate((tseries_1d,tseries_10d,tseries_dark))
     
     dissimilarity_matrix = compute_diss_mat(seg_time, tseries)
+    labels_cond = generate_labels_per_condition(seg_time)
     
     
+    seg_time, tseries, dissimilarity_matrix, labels_cond = cleaning_procedure(seg_time, tseries, dissimilarity_matrix, labels_cond)
     
+    header = ['Main dataset: darkness 18 flies 4 sessions; light 1, 10 degrees 33 flies 2 sessions; percentile 98.5; read as header, seg_time, tseries, dissimilarity_matrix, labels_cond, flies = pickle.load(f)']
+    flies = list(np.concatenate(([1893,1894],np.arange(1896,1912,1),np.arange(2101,2113,1),np.arange(2114,2117,1), np.arange(1641,1645,1),np.arange(1646,1654,1),np.arange(1655,1659,1),[1660,1661])))
+    
+    # with open('dark_4ss_18_light_2ss_33_log21_clean.pickle','wb') as f:
+    #     pickle.dump([header, seg_time, tseries, dissimilarity_matrix, labels_cond, flies], f, protocol = 4)

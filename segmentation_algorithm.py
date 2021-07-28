@@ -14,6 +14,7 @@ import os
 import math
 import scipy.io
 from scipy.signal import savgol_filter
+import pickle
 
 #Parallel processing
 from joblib import Parallel, delayed
@@ -385,9 +386,36 @@ if __name__ == "__main__":
     w = np.array(np.unique(np.round(np.logspace(1,2,20))),dtype=np.int64)[1:7]
     lag = 1
     
-    cwd = os.getcwd()
-    filename = 'Fly_2112_1d.mat'
-    tseries = openData('C:\\Users\\Sebastian\\Documents\\Paper Tomas\\Data\\' + filename)
-    breaks_segments = change_point(w,N,per,tseries,20, lag = 1, cond_thresh=1e6)
+    # Flies for light conditions
+    flies = list(np.concatenate(([1893,1894],np.arange(1896,1912,1),np.arange(2101,2113,1),np.arange(2114,2117,1))))
+    
+    # Flies for darkness
+    # flies = list(np.concatenate((np.arange(1641,1645,1),np.arange(1646,1654,1),np.arange(1655,1659,1),[1660,1661])))
+    
+    for fly in flies:
+        filename = 'Fly_' + str(fly) + '_10d.mat' #For 10 degree 
+        # filename = 'Fly_' + str(fly) + '_1d.mat' #For 1 degree
+        # filename = 'Fly_' + str(fly) + '_4ss.mat' #Darkness
+        tseries = openData('.\\Data\\' + filename)
+   
+    
+        #apply segmentation algorithm
+        breaks_segments = change_point(w,N,per,tseries,20, lag, cond_thresh=1e6)
+        print("Break Segments: ", breaks_segments)
+            
+        seg_time = breaks_segments[0][0]
+
+        
+        save_file = 'Fly' + str(fly) + '_acc_10d_log21.pickle' #For 10 degree 
+        save_file = 'Fly' + str(fly) + '_acc_1d_log21.pickle' #For 1 degree
+        save_file = 'Fly' + str(fly) + '_acc_4ss_log21.pickle' #Darkness
+    
+        with open('.\\Processed data\\'+save_file,'wb') as f:
+            pickle.dump([seg_time, tseries], f)
+            
+        del seg_time, tseries
     
     
+    
+    
+
