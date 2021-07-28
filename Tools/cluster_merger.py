@@ -93,7 +93,7 @@ def initiliaze_params():
     Z[:,2] = np.round(Z[:,2],decimals)
     auc_thresh = 0.99
     
-    return dend, colormap, seg_time_len, w, Z, color_palette, coordinates, auc_thresh, seg_time, tseries
+    return dend, colormap, seg_time_len, w, Z, color_palette, coordinates, auc_thresh, pdist, seg_time, tseries
 
 def reconstruct_original_from_PC(features, n_comp, nComp):
     """Denoises the samples by reconstructing them with fewer principal components     
@@ -380,7 +380,7 @@ def check_pairs(pairs, previous_pairs):
 
 if __name__ == "__main__":
     
-    dend, colormap, seg_time_len, w, Z, color_palette, coordinates, auc_thresh, seg_time, tseries = initiliaze_params()
+    dend, colormap, seg_time_len, w, Z, color_palette, coordinates, auc_thresh, pdist, seg_time, tseries = initiliaze_params()
     
     pairs, table_clust_dist = get_neighbor_pairs(dend, color_palette, Z)
     
@@ -438,5 +438,6 @@ if __name__ == "__main__":
         previous_pairs = np.vstack((pairs, previous_pairs))
         print('--------------')
         
-    
+    dend = hierarchical_clustering(900,color_palette,pdist,'ward')
+    colormap = generate_cluster_map(dend)
                     

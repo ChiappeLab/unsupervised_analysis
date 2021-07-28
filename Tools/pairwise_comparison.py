@@ -272,15 +272,16 @@ if __name__ == "__main__":
     
        
     flies = list(np.concatenate((np.arange(1641,1645,1),np.arange(1646,1654,1),np.arange(1655,1659,1),[1660,1661])))
-    filename = ['Fly_','_dark_hang_975.pickle']
+    filename = ['Fly','_acc_4ss_log21.pickle']
     seg_time_dark, tseries_dark = concaTseries(flies,filename)
     
     flies = list(np.concatenate(([1893,1894],np.arange(1896,1912,1),np.arange(2101,2113,1),np.arange(2114,2117,1))))
-    filename = ['Fly_','_1d_hang_975.pickle']
+    filename = ['Fly','_acc_1d_log21.pickle']
     seg_time_1d, tseries_1d = concaTseries(flies,filename)
     
-    filename = ['Fly_','_10d_hang_975.pickle']
+    filename = ['Fly','_acc_10d_log21.pickle']
     seg_time_10d, tseries_10d = concaTseries(flies,filename)
+
     
     seg_time_10d = [[x[0] + seg_time_1d[-1][1], x[1] + seg_time_1d[-1][1]] for x in seg_time_10d]
     seg_time_dark = [[x[0] + seg_time_10d[-1][1], x[1] + seg_time_10d[-1][1]] for x in seg_time_dark]
