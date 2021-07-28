@@ -5,9 +5,13 @@ Created on Mon Jul 19 20:42:20 2021
 @author: Sebastian
 """
 
+# import os
+# os.chdir('.\\Tools\\')
+
 import numpy as np
 from sklearn.decomposition import PCA
 import pandas as pd
+
 import concurrent.futures
 from scipy.cluster.hierarchy import linkage
 import scipy.spatial.distance as ssd

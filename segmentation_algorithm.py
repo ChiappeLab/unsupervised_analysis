@@ -3,14 +3,21 @@
 Created on Thu Jul 15 20:49:05 2021
 
 @author: Sebastian
+
+Most of the code shown below comes from the repository of Antonio C Costa
+https://github.com/AntonioCCosta/local-linear-segmentation
+
+Which is an implementation of the algorithm describe in the following publication
+
+Adaptive, locally linear models of complex dynamics
+Antonio C. Costa, Tosif Ahamed, Greg J. Stephens
+Proceedings of the National Academy of Sciences Jan 2019, 116 (5) 1501-1510; DOI: 10.1073/pnas.1813476116
+
+
 """
 
-#data format library
-import h5py
-#numpy
 import numpy as np
 import numpy.ma as ma
-import os
 import math
 import scipy.io
 from scipy.signal import savgol_filter

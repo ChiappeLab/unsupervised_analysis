@@ -5,15 +5,15 @@ Created on Mon Jul 19 16:01:52 2021
 @author: Sebastian
 """
 
+# import os
+# os.chdir('.\\Tools\\')
+
 import numpy as np
 import matplotlib.pyplot as plt
 from collections import defaultdict
 from matplotlib.pyplot import cm
 import matplotlib as mpl
 import pickle
-from itertools import combinations, chain
-
-#load clustering packages
 import scipy.cluster.hierarchy as shc
 
 
