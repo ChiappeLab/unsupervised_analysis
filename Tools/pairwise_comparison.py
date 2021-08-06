@@ -5,9 +5,7 @@ Created on Thu Jul 15 20:57:42 2021
 @author: Sebastian
 """
 
-# import os
-# os.chdir('.\\Tools\\')
-
+import os
 import numpy as np
 import matplotlib.pyplot as plt
 from tqdm import tqdm
@@ -248,7 +246,7 @@ def compute_diss_mat(seg_time, tseries):
     
     # for model in tqdm(list(c)): #enable in case you want to have a progress bar
     for model in c:
-        print('I am here')
+
         modelx, modely = model 
         t0_w1, tf_w1 = seg_time[modelx]
         t0_w2, tf_w2 = seg_time[modely]

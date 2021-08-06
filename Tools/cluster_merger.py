@@ -5,9 +5,6 @@ Created on Mon Jul 19 20:42:20 2021
 @author: Sebastian
 """
 
-# import os
-# os.chdir('.\\Tools\\')
-
 import numpy as np
 from sklearn.decomposition import PCA
 import pandas as pd
@@ -67,7 +64,7 @@ def initiliaze_params():
         Time series with the kinematics
         
     """
-    
+    print('Opening the dataset')
     with open('dark_4ss_18_light_2ss_33_log21_clean.pickle','rb') as f:
         header, seg_time, tseries, dissimilarity_matrix, labels_cond, flies = pickle.load(f)
         
@@ -85,11 +82,14 @@ def initiliaze_params():
                     'coral','peachpuff','navajowhite','lemonchiffon','bisque',
                     'tan','moccasin','darkkhaki','palegreen']
     
+    print('Computing the Hierarchical clustering')
     dend = hierarchical_clustering(thresh,color_palette_lower,pdist,'ward')
     colormap = generate_cluster_map(dend)
     
     seg_time_len = [x[1]-x[0] for x in seg_time]
     w = np.array(np.unique(np.round(np.logspace(1,2,20))),dtype=np.int64)[1:7]
+    
+    print('Computing the linkage')
     Z = linkage(pdist, 'ward')
     color_palette = color_palette_lower.copy()
     decimals = 5
@@ -388,6 +388,7 @@ if __name__ == "__main__":
     
     pairs, table_clust_dist = get_neighbor_pairs(dend, color_palette, Z)
     
+    print('Computing the first iteration')
     with concurrent.futures.ThreadPoolExecutor(max_workers=None) as executor:
         future_pair = {executor.submit(getAUC, pair, colormap, seg_time, tseries): pair for pair in pairs}
         for future in concurrent.futures.as_completed(future_pair):
@@ -412,6 +413,7 @@ if __name__ == "__main__":
     previous_pairs = pairs.copy()
     print('--------------')
     
+    print('Computing the remaining iterations')    
     while True:
         pairs, table_clust_dist = get_neighbor_pairs(dend, color_palette, Z)
         pairs = check_pairs(pairs, previous_pairs)

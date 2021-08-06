@@ -12,6 +12,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from collections import defaultdict
 from matplotlib.pyplot import cm
+from itertools import chain
 import matplotlib as mpl
 import pickle
 import scipy.cluster.hierarchy as shc
