@@ -6,58 +6,26 @@ Created on Wed May 26 14:52:12 2021
 """
 import numpy as np
 import matplotlib.pyplot as plt
-import math
 import pandas as pd
-#from tqdm import tqdm
 import scipy.io
 import pickle
-from itertools import combinations, permutations, product, chain, repeat
 import scipy
-from tqdm import tqdm
 import seaborn as sns
-from numba import jit
-import random
-from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
 import csv
-from collections import Counter
 from statannot import add_stat_annotation
 
-
-#load clustering packages
-import scipy.cluster as cl
 import scipy.spatial.distance as ssd
-from scipy.cluster.hierarchy import dendrogram, fcluster, linkage
-import scipy.cluster.hierarchy as shc
-from sklearn.cluster import AgglomerativeClustering
-from scipy.spatial.distance import squareform
-from sklearn.metrics import pairwise_distances
+from Tools.analysis_tools import hierarchical_clustering, generate_cluster_map
 
-from sklearn.model_selection import train_test_split
-from sklearn import svm
-from sklearn.metrics import accuracy_score, roc_curve, auc
-from sklearn.linear_model import LogisticRegression
-from sklearn.linear_model import LinearRegression
-from sklearn.preprocessing import MinMaxScaler
-from sklearn.neighbors import KNeighborsClassifier
-from sklearn.model_selection import GridSearchCV
-from sklearn.model_selection import permutation_test_score
-from sklearn.model_selection import StratifiedKFold
-from sklearn.ensemble import RandomForestClassifier
 
-#Parallel processing
-import multiprocessing
-from concurrent.futures import ProcessPoolExecutor
-
-#Import customized utilities
-import smpUTILS as utils
-u = utils.smpUTILS()
 
 
 """
 Load the dataset
 """
-with open('dark_4ss_18_light_2ss_33_log21_clean.pickle','rb') as f:
+
+with open('.\\Processed data\\dark_4ss_18_light_2ss_33_log21_clean.pickle','rb') as f:
     header, seg_time, tseries, dissimilarity_matrix, labels_cond, flies = pickle.load(f)
 
 # Dissimilarity matrix in vector-form for the Hierarchical Clustering
@@ -73,10 +41,10 @@ seg_time_len = [x[1]-x[0] for x in seg_time]
 Figure 2A
 """
 
-path_ = scipy.io.loadmat('Fly1893_path_1d.mat')
+path_ = scipy.io.loadmat('.\\Data\\Fly1893_path_1d.mat')
 path_ = path_['path']
 
-filename = 'LocalCurvature' + str(1893) + '_1d_2.txt'
+filename = '.\\Data\\LocalCurvature' + str(1893) + '_1d_2.txt'
 curvature_1d = []
 with open(filename, 'r') as f:
         reader = csv.reader(f, delimiter='\n')
@@ -109,26 +77,25 @@ Figure 2B
 """
 
 thresh = 6000
-dend = u.applyHC(thresh, ['red', 'black'], pdist, 'ward')
-colormap = u.genColormap(dend)
+dend = hierarchical_clustering(thresh, ['red', 'black'], pdist, 'ward')
+colormap = generate_cluster_map(dend)
+
+df = pd.DataFrame([])
 
 ax_labels = ['black', 'red']
-for j, color in tqdm(enumerate(ax_labels)):
+for j, color in enumerate(ax_labels):
     amount = []
     for long in w:    
+        print(color,long)
         
         amount.append(len([tseries[seg_time[i][0]:seg_time[i][1],:2] 
                                       for i, x in enumerate(zip(seg_time_len,colormap)) 
-                                      if x == (long,color)]))
+                                      if x == (long,color)]))    
     
-    if j > 0:
-        df = df.append(pd.DataFrame({'color':[color for x in range(len(w))],
-                                     'Time (ms)':np.round(w*(100/6),1),
-                                     'amount': amount}))
-    else:
-        df = pd.DataFrame({'color':[color for x in range(len(w))],
-                           'Time (ms)':np.round(w*(100/6),1),
-                           'amount': amount})
+    df = df.append(pd.DataFrame({'color':[color for x in range(len(w))],
+                                 'Time (ms)':np.round(w*(100/6),1),
+                                 'amount': amount}))
+
         
 df['percentage'] = (df.groupby(['color','Time (ms)']).max()/df.groupby('color').sum()).amount.values
 
@@ -156,26 +123,38 @@ color_palette_lower = ['black', 'cyan', 'cyan', 'magenta', 'magenta', 'blue', 'b
                        'salmon', 'salmon', 'salmon', 'salmon', 'salmon', 'salmon', 'salmon', 'salmon',
                        'salmon', 'salmon', 'salmon']
 
-dend = u.applyHC(thresh,color_palette_lower,pdist,'ward')
-colormap = u.genColormap(dend)
+dend = hierarchical_clustering(thresh,color_palette_lower,pdist,'ward')
+colormap = generate_cluster_map(dend)
 
 
 """
 Figure 2D
 """
 
+def denoise_ts(features, n_components, nComp):
+    pca = PCA(n_components=n_components)
+    X = pca.fit_transform(features)
+    
+    mu = np.mean(features, axis=0)
+    
+    Xhat = np.dot(X[:,:nComp], pca.components_[:nComp,:])
+    Xhat += mu
+    
+    return Xhat
+
 ax_labels = ['black','cyan', 'magenta', 'blue','darkviolet','chocolate',
-             'darkolivegreen','mediumspringgreen','dodgerblue','lime']
-w = [11,16,21]
+              'darkolivegreen','mediumspringgreen','dodgerblue','lime']
+
+w_ = [11,16,21]
+n_components = 3
+nComp = 2
+ts_labels = ['Rotational \n Velocity \n (°/s)', 'Forward \n Velocity \n (mm/s)']
 
 for color in ax_labels:
     acum = 0
-    n_components = 2
-    nComp = 2
     acum_pc = 0
        
-    
-    
+        
     fig2d = plt.figure(figsize=(6,6))
     ax1 = fig2d.add_subplot(411)
     ax1.set_ylim(-350,350)
@@ -201,49 +180,35 @@ for color in ax_labels:
     ax2.spines['bottom'].set_visible(False)
     
 
-    for long in w:    
+    for long in w_:    
         
         timeseries = [tseries[seg_time[i][0]:seg_time[i][1],:2] 
                       for i, x in enumerate(zip(seg_time_len,colormap)) 
                       if x == (long,color)]   
         
         if timeseries:
-            features = pd.DataFrame(np.vstack([x[:,0] for x in timeseries]))
-            pca = PCA(n_components=2)
-            X = pca.fit_transform(features)
-            
-            mu = np.mean(features, axis=0)
-            
-            Xhat = np.dot(X[:,:nComp], pca.components_[:nComp,:])
-            Xhat += mu  
-
-            data = pd.DataFrame({'t': np.hstack([np.arange(acum,long+acum,1) for x in range(len(Xhat))]),
-                                'Rotational \n Velocity \n (°/s)': Xhat.reshape(-1)})
-            sns.lineplot(x = 't', 
-                         y = 'Rotational \n Velocity \n (°/s)', 
-                         data = data, 
-                         color = color, 
-                         ax = ax1,
-                         )
-            
-            
-            features = pd.DataFrame(np.vstack([x[:,1] for x in timeseries]))
-            pca = PCA(n_components=n_components)
-            X = pca.fit_transform(features)
-            
-            mu = np.mean(features, axis=0)
-
-            Xhat = np.dot(X[:,:nComp], pca.components_[:nComp,:])
-            Xhat += mu 
-
-            data = pd.DataFrame({'Time (ms)': np.hstack([np.arange(acum,long+acum,1) for x in range(len(Xhat))]),
-                                'Forward \n Velocity \n (mm/s)': Xhat.reshape(-1)})
-            sns.lineplot(x = 'Time (ms)', 
-                         y = 'Forward \n Velocity \n (mm/s)', 
-                         data = data, 
-                         color = color, 
-                         ax = ax2)
-
+            for ts in range(timeseries[0].data.shape[1]):
+                features = pd.DataFrame(np.vstack([x[:,ts] for x in timeseries]))
+                Xhat = denoise_ts(features, n_components, nComp)
+    
+                data = pd.DataFrame({'t': np.hstack([np.arange(acum,long+acum,1) for x in range(len(Xhat))]),
+                                    ts_labels[ts]: Xhat.reshape(-1)})                   
+                
+                
+                if ts<1:
+                    sns.lineplot(x = 't', 
+                                  y = ts_labels[ts], 
+                                  data = data, 
+                                  color = color, 
+                                  ax = ax1,
+                                  )
+                else:
+                    sns.lineplot(x = 't', 
+                              y = ts_labels[ts], 
+                              data = data, 
+                              color = color, 
+                              ax = ax2,
+                              )               
         
         ax1.axvline(x = (acum+long), linestyle = '--', color = 'black', linewidth=1)
         ax2.axvline(x = (acum+long), linestyle = '--', color = 'black', linewidth=1)
@@ -327,8 +292,8 @@ Figure 2E - bottom
 """
 
 #before/after plots average
-color_t = 'darkolivegreen'
-color_t1 = 'mediumspringgreen'
+color_t = 'cyan'
+color_t1 = 'black'
 win = 16
 for color in [color_t]:   
     
@@ -459,27 +424,6 @@ for color in ['dodgerblue', 'lime']:
                         loc='inside', verbose=2)
     ax.legend(loc='upper left', bbox_to_anchor=(1.03, 1))
     
-
-"""
-Figure Supplementary 2
-"""
-
-
-
-
-"""Uses image moments to find the centre and orientation of a contour
-
-    Parameters
-    ----------
-    contour : array like
-        A contour represented as an array
-
-    Returns
-    -------
-    c, theta : array, float
-        The centre of the contour and its orientation (radians, -pi/2 < theta <= pi/2)
-    """
-
 
 
                     
